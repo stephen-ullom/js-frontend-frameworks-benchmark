@@ -7,17 +7,19 @@ import {
   updateData,
   type DataRecord,
 } from "@shared/config";
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useState, useRef } from "react";
 
 function App() {
   const [data, setData] = useState<DataRecord[]>([]);
-  const [lastAction, setLastAction] = useState({ name: "N/A", duration: 0 });
+  const perfTextRef = useRef<HTMLDivElement>(null);
 
-  // This effect now correctly depends on `data` to run after each state change.
   useLayoutEffect(() => {
     const result = monitor.stop();
-    if (result) {
-      setLastAction(result);
+    if (result && perfTextRef.current) {
+      perfTextRef.current.innerHTML = CONFIG.UI_TEXT.getPerfResult(
+        result.name,
+        result.duration
+      );
     }
   }, [data]);
 
@@ -53,9 +55,8 @@ function App() {
 
   return (
     <div>
-      <h1>Framework Stress Test</h1>
+      <h1>{CONFIG.UI_TEXT.TITLE}</h1>
 
-      {/* --- Controls --- */}
       <div>
         <button onClick={runCreate}>{CONFIG.BUTTON_LABELS.CREATE}</button>
         <button onClick={runUpdate} disabled={data.length === 0}>
@@ -69,18 +70,16 @@ function App() {
         </button>
       </div>
 
-      {/* --- Performance Info --- */}
-      <div>
-        Last Action: {lastAction.name} | Duration:{" "}
-        <strong>{lastAction.duration.toFixed(2)}ms</strong>
-      </div>
+      <div
+        ref={perfTextRef}
+        dangerouslySetInnerHTML={{ __html: CONFIG.UI_TEXT.PERF_DEFAULT }}
+      />
 
-      {/* --- Data Table --- */}
       {data.length === 0 ? (
-        <p>Table is empty.</p>
+        <p>{CONFIG.UI_TEXT.EMPTY_TABLE}</p>
       ) : (
         <div style={{ overflow: "auto", maxHeight: "80vh", marginTop: "1rem" }}>
-          <table border="1" style={{ borderCollapse: "collapse" }}>
+          <table border={1} style={{ borderCollapse: "collapse" }}>
             <thead>
               <tr>
                 {CONFIG.TABLE_HEADERS.map((h) => (

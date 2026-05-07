@@ -1,4 +1,3 @@
-// --- TypeScript Type Definition ---
 export type DataRecord = {
   id: number;
   uuid: string;
@@ -18,7 +17,6 @@ export type DataRecord = {
   tags: string[];
 };
 
-// --- Stress Test Configuration & Constants ---
 export const CONFIG = {
   CREATE_COUNT: 100,
   ACTION_TEXTS: {
@@ -33,7 +31,6 @@ export const CONFIG = {
     SWAP: `Swap Rows`,
     CLEAR: `Clear`,
   },
-  // Default headers to display in the table for consistency across frameworks
   TABLE_HEADERS: [
     "id",
     "firstName",
@@ -43,10 +40,18 @@ export const CONFIG = {
     "isActive",
     "tags",
     "rating",
-  ] as const, // `as const` provides better type safety
+  ] as const,
+  UI_TEXT: {
+    TITLE: "Framework Stress Test",
+    EMPTY_TABLE: "Table is empty.",
+    PERF_DEFAULT: "Last Action: N/A | Duration: <strong>0.00ms</strong>",
+    getPerfResult: (name: string, duration: number) =>
+      `Last Action: ${name} | Duration: <strong>${duration.toFixed(
+        2
+      )}ms</strong>`,
+  },
 };
 
-// --- Performance Measurement Class ---
 class PerformanceMonitor {
   private startTime = 0;
   private actionName = "";
@@ -65,11 +70,8 @@ class PerformanceMonitor {
     return result;
   }
 }
-// Export a single instance for the app to use
 export const monitor = new PerformanceMonitor();
 
-// --- Data Generation (Your provided logic) ---
-// Note: I've removed the console.log from here, as side-effects are best left to the consumer.
 const FIRST_NAMES = [
   "James",
   "Emma",
@@ -179,49 +181,52 @@ const TAGS = [
   "veteran",
 ];
 
-const getRandomItem = <T>(arr: T[]): T =>
-  arr[Math.floor(Math.random() * arr.length)];
-
 export function buildData(rowCount: number): DataRecord[] {
+  let seed = 12345;
+  const random = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+
+  const getRandomItem = <T>(arr: T[]): T =>
+    arr[Math.floor(random() * arr.length)];
+
   const data: DataRecord[] = [];
   for (let i = 0; i < rowCount; i++) {
     const firstName = getRandomItem(FIRST_NAMES);
     const lastName = getRandomItem(LAST_NAMES);
-    const numTags = Math.floor(Math.random() * 4) + 1;
-    const userTags = [...TAGS]
-      .sort(() => 0.5 - Math.random())
-      .slice(0, numTags);
+    const numTags = Math.floor(random() * 4) + 1;
+    const userTags = [...TAGS].sort(() => 0.5 - random()).slice(0, numTags);
+
     data.push({
       id: i + 1,
-      uuid: crypto.randomUUID(),
+      uuid: `static-uuid-${i}-${Math.floor(random() * 10000)}`, // Deterministic ID
       firstName: firstName,
       lastName: lastName,
       email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${i}@example.com`,
-      age: Math.floor(Math.random() * 48) + 18,
-      salary: Math.floor(Math.random() * 170000) + 30000,
+      age: Math.floor(random() * 48) + 18,
+      salary: Math.floor(random() * 170000) + 30000,
       department: getRandomItem(DEPARTMENTS),
       position: getRandomItem(POSITIONS),
       hireDate: new Date(
-        2010 + Math.floor(Math.random() * 14),
-        Math.floor(Math.random() * 12),
-        Math.floor(Math.random() * 28) + 1
+        2010 + Math.floor(random() * 14),
+        Math.floor(random() * 12),
+        Math.floor(random() * 28) + 1
       )
         .toISOString()
         .split("T")[0],
-      isActive: Math.random() > 0.15,
-      phone: `+1-${Math.floor(Math.random() * 800) + 200}-${
-        Math.floor(Math.random() * 800) + 200
-      }-${Math.floor(Math.random() * 9000) + 1000}`,
+      isActive: random() > 0.15,
+      phone: `+1-${Math.floor(random() * 800) + 200}-${
+        Math.floor(random() * 800) + 200
+      }-${Math.floor(random() * 9000) + 1000}`,
       city: getRandomItem(CITIES),
       state: getRandomItem(STATES),
-      rating: +(Math.random() * 5).toFixed(2),
+      rating: +(random() * 5).toFixed(2),
       tags: userTags,
     });
   }
   return data;
 }
-
-// --- PURE Data Manipulation Functions ---
 
 export const createData = (): DataRecord[] => {
   return buildData(CONFIG.CREATE_COUNT);
