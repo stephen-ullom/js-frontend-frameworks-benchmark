@@ -18,7 +18,7 @@ export type DataRecord = {
 };
 
 export const CONFIG = {
-  CREATE_COUNT: 100,
+  CREATE_COUNT: 50000,
   ACTION_TEXTS: {
     CREATE: `Create 50,000 Rows`,
     UPDATE: `Update Every 10th Row (Salary +50)`,
@@ -200,7 +200,7 @@ export function buildData(rowCount: number): DataRecord[] {
 
     data.push({
       id: i + 1,
-      uuid: `static-uuid-${i}-${Math.floor(random() * 10000)}`, // Deterministic ID
+      uuid: `static-uuid-${i}-${Math.floor(random() * 10000)}`,
       firstName: firstName,
       lastName: lastName,
       email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${i}@example.com`,

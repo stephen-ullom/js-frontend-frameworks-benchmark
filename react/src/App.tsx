@@ -7,78 +7,132 @@ import {
   updateData,
   type DataRecord,
 } from "@shared/config";
-import { useLayoutEffect, useState, useRef } from "react";
+import { useLayoutEffect, useState, useEffect, useRef } from "react";
+
+type BenchmarkResult = { action: string; duration: number };
 
 function App() {
   const [data, setData] = useState<DataRecord[]>([]);
-  const perfTextRef = useRef<HTMLDivElement>(null);
+  const [results, setResults] = useState<BenchmarkResult[]>([]);
+  const [step, setStep] = useState(1);
+
+  const resultsRef = useRef<BenchmarkResult[]>([]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      monitor.start(CONFIG.ACTION_TEXTS.CREATE);
+      setData(createData());
+      setStep(2);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   useLayoutEffect(() => {
     const result = monitor.stop();
-    if (result && perfTextRef.current) {
-      perfTextRef.current.innerHTML = CONFIG.UI_TEXT.getPerfResult(
-        result.name,
-        result.duration
-      );
+
+    if (result) {
+      resultsRef.current.push({
+        action: result.name,
+        duration: result.duration,
+      });
     }
-  }, [data]);
 
-  const runCreate = () => {
-    monitor.start(CONFIG.ACTION_TEXTS.CREATE);
-    setData(createData());
-  };
+    if (step > 1 && step < 5 && result) {
+      const timer = setTimeout(() => {
+        if (step === 2) {
+          monitor.start(CONFIG.ACTION_TEXTS.UPDATE);
+          setData((prev) => updateData(prev));
+          setStep(3);
+        } else if (step === 3) {
+          monitor.start(CONFIG.ACTION_TEXTS.SWAP);
+          setData((prev) => swapData(prev));
+          setStep(4);
+        } else if (step === 4) {
+          monitor.start(CONFIG.ACTION_TEXTS.CLEAR);
+          setData(clearData());
+          setStep(5);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [step]);
 
-  const runUpdate = () => {
-    if (data.length === 0) return;
-    monitor.start(CONFIG.ACTION_TEXTS.UPDATE);
-    setData(updateData(data));
-  };
-
-  const runSwap = () => {
-    if (data.length < 10) return;
-    monitor.start(CONFIG.ACTION_TEXTS.SWAP);
-    setData(swapData(data));
-  };
-
-  const runClear = () => {
-    monitor.start(CONFIG.ACTION_TEXTS.CLEAR);
-    setData(clearData());
-  };
+  useEffect(() => {
+    if (step === 5) {
+      setResults(resultsRef.current);
+    }
+  }, [step]);
 
   const renderCell = (row: DataRecord, header: keyof DataRecord) => {
     const value = row[header];
-    if (Array.isArray(value)) {
-      return value.join(", ");
-    }
-    return String(value);
+    return Array.isArray(value) ? value.join(", ") : String(value);
   };
+
+  const isRunning = step > 0 && step <= 4;
 
   return (
     <div>
-      <h1>{CONFIG.UI_TEXT.TITLE}</h1>
+      <h1>{CONFIG.UI_TEXT.TITLE} - Automated Benchmark</h1>
 
-      <div>
-        <button onClick={runCreate}>{CONFIG.BUTTON_LABELS.CREATE}</button>
-        <button onClick={runUpdate} disabled={data.length === 0}>
-          {CONFIG.BUTTON_LABELS.UPDATE}
-        </button>
-        <button onClick={runSwap} disabled={data.length === 0}>
-          {CONFIG.BUTTON_LABELS.SWAP}
-        </button>
-        <button onClick={runClear} disabled={data.length === 0}>
-          {CONFIG.BUTTON_LABELS.CLEAR}
-        </button>
-      </div>
+      {isRunning && (
+        <h3 style={{ color: "blue" }}>
+          Running Benchmark... (Step {step} of 4)
+        </h3>
+      )}
 
-      <div
-        ref={perfTextRef}
-        dangerouslySetInnerHTML={{ __html: CONFIG.UI_TEXT.PERF_DEFAULT }}
-      />
+      {step === 5 && (
+        <div
+          style={{
+            marginBottom: "2rem",
+            padding: "1rem",
+            backgroundColor: "#f0f0f0",
+          }}
+        >
+          <h2>Benchmark Results</h2>
+          <table
+            border={1}
+            style={{
+              borderCollapse: "collapse",
+              width: "100%",
+              backgroundColor: "white",
+            }}
+          >
+            <thead>
+              <tr>
+                <th style={{ padding: "8px" }}>Action</th>
+                <th style={{ padding: "8px" }}>Duration (ms)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((res, idx) => (
+                <tr key={idx}>
+                  <td style={{ padding: "8px" }}>{res.action}</td>
+                  <td style={{ padding: "8px" }}>
+                    <strong>{res.duration.toFixed(2)}</strong>
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td style={{ padding: "8px" }}>
+                  <strong>Total Time</strong>
+                </td>
+                <td style={{ padding: "8px" }}>
+                  <strong>
+                    {results
+                      .reduce((acc, curr) => acc + curr.duration, 0)
+                      .toFixed(2)}
+                  </strong>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      {data.length === 0 ? (
-        <p>{CONFIG.UI_TEXT.EMPTY_TABLE}</p>
-      ) : (
-        <div style={{ overflow: "auto", maxHeight: "80vh", marginTop: "1rem" }}>
+      <div style={{ overflow: "auto", maxHeight: "40vh", marginTop: "1rem" }}>
+        {data.length === 0 ? (
+          <p>{CONFIG.UI_TEXT.EMPTY_TABLE}</p>
+        ) : (
           <table border={1} style={{ borderCollapse: "collapse" }}>
             <thead>
               <tr>
@@ -97,8 +151,8 @@ function App() {
               ))}
             </tbody>
           </table>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
