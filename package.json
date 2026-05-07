@@ -10,8 +10,9 @@
     "vue"
   ],
   "scripts": {
-    "start": "concurrently \"npm run start:react\"",
-    "start:react": "cd react && npm run dev"
+    "start": "concurrently \"npm run start:react\" \"npm run start:vue\"",
+    "start:react": "cd react && npm run dev",
+    "start:vue": "cd vue && npm run dev"
   },
   "keywords": [],
   "author": "",
