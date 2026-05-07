@@ -1,0 +1,10 @@
+node_modules
+angular/node_modules
+react/node_modules
+preact/node_modules
+qwik/node_modules
+shared-config/node_modules
+solid/node_modules
+svelte/node_modules
+vue/node_modules
+.DS_Store

@@ -1,0 +1,25 @@
+{
+  "name": "benchmark",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "workspaces": [
+    "shared-config",
+    "react",
+    "angular",
+    "vue"
+  ],
+  "scripts": {
+    "start": "concurrently \"npm run start:react\"",
+    "start:react": "cd react && npm run dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}
