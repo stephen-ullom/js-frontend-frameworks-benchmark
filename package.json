@@ -10,7 +10,8 @@
     "vue",
     "solid",
     "svelte",
-    "preact"
+    "preact",
+    "qwik"
   ],
   "scripts": {
     "start": "concurrently \"npm run start:react\" \"npm run start:vue\" \"npm run start:angular\"",
@@ -19,7 +20,8 @@
     "start:angular": "cd angular && npm run start",
     "start:solid": "cd solid && npm run dev",
     "start:svelte": "cd svelte && npm run dev",
-    "start:preact": "cd preact && npm run dev"
+    "start:preact": "cd preact && npm run dev",
+    "start:qwik": "cd qwik && npm run dev"
   },
   "keywords": [],
   "author": "",
