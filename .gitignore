@@ -9,3 +9,4 @@ svelte/node_modules
 vue/node_modules
 .DS_Store
 angular/.angular
+svelte/.svelte-kit

@@ -8,14 +8,16 @@
     "react",
     "angular",
     "vue",
-    "solid"
+    "solid",
+    "svelte"
   ],
   "scripts": {
     "start": "concurrently \"npm run start:react\" \"npm run start:vue\" \"npm run start:angular\"",
     "start:react": "cd react && npm run dev",
     "start:vue": "cd vue && npm run dev",
     "start:angular": "cd angular && npm run start",
-    "start:solid": "cd solid && npm run dev"
+    "start:solid": "cd solid && npm run dev",
+    "start:svelte": "cd svelte && npm run dev"
   },
   "keywords": [],
   "author": "",
