@@ -17,8 +17,18 @@ export type DataRecord = {
   tags: string[];
 };
 
+const getRowCount = () => {
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("rows")) {
+      return parseInt(params.get("rows") as string, 10);
+    }
+  }
+  return 1000;
+};
+
 export const CONFIG = {
-  CREATE_COUNT: 50000,
+  CREATE_COUNT: getRowCount(),
   ACTION_TEXTS: {
     CREATE: `Create 50,000 Rows`,
     UPDATE: `Update Every 10th Row (Salary +50)`,
@@ -33,13 +43,21 @@ export const CONFIG = {
   },
   TABLE_HEADERS: [
     "id",
+    "uuid",
     "firstName",
     "lastName",
-    "position",
+    "email",
+    "age",
     "salary",
+    "department",
+    "position",
+    "hireDate",
     "isActive",
-    "tags",
+    "phone",
+    "city",
+    "state",
     "rating",
+    "tags",
   ] as const,
   UI_TEXT: {
     TITLE: "Framework Stress Test",
