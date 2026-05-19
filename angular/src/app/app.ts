@@ -1,5 +1,4 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnInit, AfterViewChecked } from '@angular/core';
+import { Component, OnInit, afterEveryRender, computed, signal } from '@angular/core';
 import {
   clearData,
   CONFIG,
@@ -27,33 +26,37 @@ type BenchmarkResult = { action: string; duration: number };
       }
     `,
   ],
-  imports: [CommonModule],
 })
-export class App implements OnInit, AfterViewChecked {
+export class App implements OnInit {
   CONFIG = CONFIG;
-  data: DataRecord[] = [];
-  results: BenchmarkResult[] = [];
-  step = 1;
+  data = signal<DataRecord[]>([]);
+  results = signal<BenchmarkResult[]>([]);
+  step = signal(1);
+  isRunning = computed(() => this.step() > 0 && this.step() <= 4);
+  totalTime = computed(() => this.results().reduce((acc, curr) => acc + curr.duration, 0));
 
   private resultsBuffer: BenchmarkResult[] = [];
   private lastProcessedStep = 1;
 
+  constructor() {
+    afterEveryRender(() => {
+      const currentStep = this.step();
+      if (currentStep !== this.lastProcessedStep) {
+        this.lastProcessedStep = currentStep;
+        this.processStep(currentStep);
+      }
+    });
+  }
+
   ngOnInit(): void {
     setTimeout(() => {
       monitor.start(CONFIG.ACTION_TEXTS.CREATE);
-      this.data = createData();
-      this.step = 2;
+      this.data.set(createData());
+      this.step.set(2);
     }, 500);
   }
 
-  ngAfterViewChecked(): void {
-    if (this.step !== this.lastProcessedStep) {
-      this.lastProcessedStep = this.step;
-      this.processStep();
-    }
-  }
-
-  private processStep(): void {
+  private processStep(currentStep: number): void {
     const measurement = monitor.stop();
     if (measurement) {
       this.resultsBuffer.push({
@@ -62,49 +65,35 @@ export class App implements OnInit, AfterViewChecked {
       });
     }
 
-    if (this.step > 1 && this.step < 5 && measurement) {
+    if (currentStep > 1 && currentStep < 5 && measurement) {
       setTimeout(() => {
-        switch (this.step) {
+        switch (currentStep) {
           case 2:
             monitor.start(CONFIG.ACTION_TEXTS.UPDATE);
-            this.data = updateData(this.data);
-            this.step = 3;
+            this.data.update((data) => updateData(data));
+            this.step.set(3);
             break;
           case 3:
             monitor.start(CONFIG.ACTION_TEXTS.SWAP);
-            this.data = swapData(this.data);
-            this.step = 4;
+            this.data.update((data) => swapData(data));
+            this.step.set(4);
             break;
           case 4:
             monitor.start(CONFIG.ACTION_TEXTS.CLEAR);
-            this.data = clearData();
-            this.step = 5;
+            this.data.set(clearData());
+            this.step.set(5);
             break;
         }
       }, 500);
     }
 
-    if (this.step === 5) {
-      setTimeout(() => {
-        this.results = [...this.resultsBuffer];
-      }, 0);
+    if (currentStep === 5) {
+      this.results.set([...this.resultsBuffer]);
     }
   }
 
   renderCell(row: DataRecord, header: keyof DataRecord): string {
     const value = row[header];
     return Array.isArray(value) ? value.join(', ') : String(value);
-  }
-
-  get isRunning(): boolean {
-    return this.step > 0 && this.step <= 4;
-  }
-
-  getTotalTime(): number {
-    return this.results.reduce((acc, curr) => acc + curr.duration, 0);
-  }
-
-  trackByUuid(index: number, row: DataRecord): string {
-    return row.uuid;
   }
 }
