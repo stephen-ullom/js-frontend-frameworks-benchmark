@@ -2,51 +2,66 @@
 <div>
   <h1>{{ CONFIG.UI_TEXT.TITLE }} - Automated Benchmark</h1>
 
-  <h3 *ngIf="isRunning" style="color: blue">Running Benchmark... (Step {{ step }} of 4)</h3>
+  @if (isRunning()) {
+    <h3 style="color: blue">Running Benchmark... (Step {{ step() }} of 4)</h3>
+  }
 
   <!-- Results table (only when benchmark is done) -->
-  <div *ngIf="step === 5" class="results-container">
-    <h2>Benchmark Results</h2>
-    <table border="1" style="width: 100%; background-color: white">
-      <thead>
-        <tr>
-          <th>Action</th>
-          <th>Duration (ms)</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let res of results; index as idx">
-          <td>{{ res.action }}</td>
-          <td>
-            <strong>{{ res.duration.toFixed(2) }}</strong>
-          </td>
-        </tr>
-        <tr>
-          <td><strong>Total Time</strong></td>
-          <td>
-            <strong>{{ getTotalTime().toFixed(2) }}</strong>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  @if (step() === 5 && results().length > 0) {
+    <div class="results-container">
+      <h2>Benchmark Results</h2>
+      <table border="1" style="width: 100%; background-color: white">
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th>Duration (ms)</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (res of results(); track $index) {
+            <tr>
+              <td>{{ res.action }}</td>
+              <td>
+                <strong>{{ res.duration.toFixed(2) }}</strong>
+              </td>
+            </tr>
+          }
+          <tr>
+            <td><strong>Total Time</strong></td>
+            <td>
+              <strong>{{ totalTime().toFixed(2) }}</strong>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  }
 
   <!-- Data table -->
   <div style="overflow: auto; max-height: 40vh; margin-top: 1rem">
-    <p *ngIf="data.length === 0">{{ CONFIG.UI_TEXT.EMPTY_TABLE }}</p>
-    <table *ngIf="data.length > 0" border="1">
-      <thead>
-        <tr>
-          <th *ngFor="let header of CONFIG.TABLE_HEADERS">{{ header }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let row of data; trackBy: trackByUuid">
-          <td *ngFor="let header of CONFIG.TABLE_HEADERS">
-            {{ renderCell(row, header) }}
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    @if (data().length === 0) {
+      <p>{{ CONFIG.UI_TEXT.EMPTY_TABLE }}</p>
+    } @else {
+      <table border="1">
+        <thead>
+          <tr>
+            @for (header of CONFIG.TABLE_HEADERS; track header) {
+              <th>{{ header }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of data(); track row.uuid) {
+            <tr>
+              @for (header of CONFIG.TABLE_HEADERS; track header) {
+                <td>
+                  {{ renderCell(row, header) }}
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
   </div>
 </div>
