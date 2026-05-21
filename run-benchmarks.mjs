@@ -12,6 +12,13 @@ const frameworks = [
   "qwik",
 ];
 
+const actions = [
+  { label: "Create Rows" },
+  { label: "Update Every 10th Row" },
+  { label: "Swap Rows" },
+  { label: "Clear Rows" },
+];
+
 let RUNS = 1;
 let MODE = "build"; // 'build' or 'dev'
 let ROWS = 50;
@@ -22,7 +29,15 @@ process.argv.slice(2).forEach((arg) => {
   if (arg.startsWith("--rows=")) ROWS = parseInt(arg.split("=")[1], 10);
 });
 
-console.log(`\n⚙️  Configuration: Mode=${MODE}, Runs=${RUNS}, Rows=${ROWS}\n`);
+if (ROWS < 10) {
+  throw new Error(
+    "--rows must be at least 10 because the swap action needs two swappable rows.",
+  );
+}
+
+console.log(
+  `\nConfiguration: Mode=${MODE}, Runs=${RUNS}, Rows=${ROWS}, Timing=browser-observed after paint\n`,
+);
 
 function waitForUrl(childProcess) {
   return new Promise((resolve) => {
@@ -34,36 +49,139 @@ function waitForUrl(childProcess) {
   });
 }
 
+async function waitForPaint(page) {
+  return page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            resolve(performance.now());
+          });
+        });
+      }),
+  );
+}
+
+async function dispatchAction(page, action) {
+  return page.evaluate((actionName) => {
+    const button = document.querySelector(
+      `[data-benchmark-action="${actionName}"]`,
+    );
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error(`Missing benchmark action button: ${actionName}`);
+    }
+
+    const start = performance.now();
+    button.click();
+    return start;
+  }, action);
+}
+
+async function getRowCount(page) {
+  return page.locator("[data-benchmark-row]").count();
+}
+
+async function getCellText(page, rowIndex, column) {
+  return page
+    .locator(`[data-row-index="${rowIndex}"] [data-column="${column}"]`)
+    .innerText();
+}
+
+async function getRowId(page, rowIndex) {
+  return page
+    .locator(`[data-row-index="${rowIndex}"]`)
+    .getAttribute("data-row-id");
+}
+
+async function measureAction(page, action, waitForExpectedState) {
+  await waitForPaint(page);
+  const start = await dispatchAction(page, action);
+  await waitForExpectedState();
+  const end = await waitForPaint(page);
+  return end - start;
+}
+
 async function runBenchmarkIteration(url, browser) {
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  // Append row count to URL so the shared config picks it up
   await page.goto(`${url}?rows=${ROWS}`);
+  await page.waitForSelector("[data-benchmark-controls]", { timeout: 60000 });
+  await waitForPaint(page);
 
-  await page.waitForSelector('h2:has-text("Benchmark Results")', {
-    timeout: 6000000,
-  });
+  const results = [];
 
-  const data = await page.evaluate(() => {
-    const rows = Array.from(document.querySelectorAll("table tbody tr"));
-    return rows
-      .map((row) => {
-        const cells = row.querySelectorAll("td");
-        return {
-          action: cells[0]?.innerText.trim(),
-          duration: parseFloat(cells[1]?.innerText.trim()) || 0,
-        };
-      })
-      .filter((res) => res.action !== "Total Time"); // Exclude total row for averaging
+  const createDuration = await measureAction(page, "create", async () => {
+    await page.waitForFunction(
+      (rows) =>
+        document.querySelector("[data-benchmark-state='created']") &&
+        document.querySelectorAll("[data-benchmark-row]").length === rows,
+      ROWS,
+    );
   });
+  results.push({ action: "Create Rows", duration: createDuration });
+
+  const firstSalary = parseFloat(await getCellText(page, 0, "salary"));
+  const updateDuration = await measureAction(page, "update", async () => {
+    await page.waitForFunction((expectedSalary) => {
+      const salary = document.querySelector(
+        `[data-row-index="0"] [data-column="salary"]`,
+      );
+      return (
+        document.querySelector("[data-benchmark-state='updated']") &&
+        salary?.textContent?.trim() === String(expectedSalary)
+      );
+    }, firstSalary + 50);
+  });
+  results.push({ action: "Update Every 10th Row", duration: updateDuration });
+
+  const secondRowId = await getRowId(page, 1);
+  const swapTargetIndex = ROWS - 9;
+  const swapTargetRowId = await getRowId(page, swapTargetIndex);
+  const swapDuration = await measureAction(page, "swap", async () => {
+    await page.waitForFunction(
+      ({ secondId, targetIndex, targetId }) => {
+        const secondRow = document.querySelector(`[data-row-index="1"]`);
+        const targetRow = document.querySelector(
+          `[data-row-index="${targetIndex}"]`,
+        );
+        return (
+          document.querySelector("[data-benchmark-state='swapped']") &&
+          secondRow?.getAttribute("data-row-id") === targetId &&
+          targetRow?.getAttribute("data-row-id") === secondId
+        );
+      },
+      {
+        secondId: secondRowId,
+        targetIndex: swapTargetIndex,
+        targetId: swapTargetRowId,
+      },
+    );
+  });
+  results.push({ action: "Swap Rows", duration: swapDuration });
+
+  const clearDuration = await measureAction(page, "clear", async () => {
+    await page.waitForFunction(
+      () =>
+        document.querySelector("[data-benchmark-state='cleared']") &&
+        document.querySelectorAll("[data-benchmark-row]").length === 0,
+    );
+  });
+  results.push({ action: "Clear Rows", duration: clearDuration });
+
+  const finalRowCount = await getRowCount(page);
+  if (finalRowCount !== 0) {
+    throw new Error(
+      `Expected clear action to remove all rows, saw ${finalRowCount}`,
+    );
+  }
 
   await context.close();
-  return data;
+  return results;
 }
 
 async function processFramework(framework, browser) {
-  console.log(`\n▶️ Starting ${framework}...`);
+  console.log(`\nStarting ${framework}...`);
   const scriptName = MODE === "dev" ? `dev:${framework}` : `start:${framework}`;
 
   const child = spawn("npm", ["run", scriptName], {
@@ -76,7 +194,7 @@ async function processFramework(framework, browser) {
     const url = await Promise.race([
       waitForUrl(child),
       new Promise((_, rej) =>
-        setTimeout(() => rej(new Error("Server start timeout")), 30000)
+        setTimeout(() => rej(new Error("Server start timeout")), 30000),
       ),
     ]);
 
@@ -89,10 +207,10 @@ async function processFramework(framework, browser) {
       allRunsData.push(data);
     }
 
-    console.log(`✅ ${framework} finished.`);
+    console.log(`${framework} finished.`);
     return calculateAverages(allRunsData);
   } catch (error) {
-    console.error(`❌ Error benchmarking ${framework}:`, error.message);
+    console.error(`Error benchmarking ${framework}:`, error.message);
     return null;
   } finally {
     try {
@@ -104,19 +222,40 @@ async function processFramework(framework, browser) {
 }
 
 function calculateAverages(allRunsData) {
-  const aggregated = {};
+  return actions.map(({ label }) => {
+    const durations = allRunsData
+      .flat()
+      .filter((item) => item.action === label)
+      .map((item) => item.duration);
 
-  allRunsData.forEach((run) => {
-    run.forEach((item) => {
-      if (!aggregated[item.action]) aggregated[item.action] = 0;
-      aggregated[item.action] += item.duration;
-    });
+    return {
+      action: label,
+      duration: (
+        durations.reduce((total, duration) => total + duration, 0) /
+        durations.length
+      ).toFixed(2),
+    };
   });
+}
 
-  return Object.keys(aggregated).map((action) => ({
-    action,
-    duration: (aggregated[action] / RUNS).toFixed(2),
-  }));
+function escapeCsv(value) {
+  const text = String(value);
+  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function createCsv(allResults) {
+  const rows = [["framework", "action", "avg_browser_observed_duration_ms"]];
+
+  for (const [framework, results] of Object.entries(allResults)) {
+    let total = 0;
+    results.forEach((result) => {
+      total += parseFloat(result.duration);
+      rows.push([framework, result.action, result.duration]);
+    });
+    rows.push([framework, "Total Average", total.toFixed(2)]);
+  }
+
+  return `${rows.map((row) => row.map(escapeCsv).join(",")).join("\n")}\n`;
 }
 
 async function main() {
@@ -130,11 +269,13 @@ async function main() {
 
   await browser.close();
 
-  let markdown = `# Framework Benchmark Results\n**Configuration:** Mode: \`${MODE}\`, Runs per framework: \`${RUNS}\`, Rows: \`${ROWS}\`\n\n`;
+  let markdown = `# Framework Benchmark Results\n\n`;
+  markdown += `**Configuration:** Mode: \`${MODE}\`, Runs per framework: \`${RUNS}\`, Rows: \`${ROWS}\`\n\n`;
+  markdown += `**Timing method:** Playwright triggers each action in the browser, waits for the expected DOM state, waits two \`requestAnimationFrame\` ticks so paint can complete, then records elapsed browser time with \`performance.now()\`.\n\n`;
 
   for (const [fw, results] of Object.entries(allResults)) {
     markdown += `## ${fw.charAt(0).toUpperCase() + fw.slice(1)}\n\n`;
-    markdown += `| Action | Avg Duration (ms) |\n| :--- | :--- |\n`;
+    markdown += `| Action | Avg Browser-Observed Duration (ms) |\n| :--- | ---: |\n`;
     let total = 0;
     results.forEach((res) => {
       markdown += `| ${res.action} | ${res.duration} |\n`;
@@ -144,8 +285,9 @@ async function main() {
   }
 
   await fs.writeFile("benchmark-results.md", markdown);
+  await fs.writeFile("benchmark-results.csv", createCsv(allResults));
   console.log(
-    "\n🎉 All benchmarks complete! Results saved to benchmark-results.md"
+    "\nAll benchmarks complete. Results saved to benchmark-results.md and benchmark-results.csv",
   );
 }
 

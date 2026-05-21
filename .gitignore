@@ -12,4 +12,4 @@ qwik/tmp/
 .DS_Store
 
 # Results
-benchmark-results.md
+benchmark-results.*
