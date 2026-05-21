@@ -18,6 +18,16 @@ const frameworks = [
   "qwik",
 ];
 
+const frameworkPackages = {
+  react: ["react", "react-dom"],
+  vue: ["vue"],
+  angular: ["@angular/core"],
+  solid: ["solid-js"],
+  svelte: ["svelte"],
+  preact: ["preact"],
+  qwik: ["@builder.io/qwik"],
+};
+
 let RUNS = 1;
 let MODE = "build"; // 'build' or 'dev'
 let ROWS = 50;
@@ -52,6 +62,33 @@ function waitForUrl(childProcess) {
       if (match) resolve(match[0]);
     });
   });
+}
+
+function getPackageLockPath(framework, packageName) {
+  return `${framework}/node_modules/${packageName}`;
+}
+
+async function getFrameworkVersions() {
+  const packageLock = JSON.parse(
+    await fs.readFile("package-lock.json", "utf8"),
+  );
+  const versions = {};
+
+  for (const framework of frameworks) {
+    const packages = frameworkPackages[framework] ?? [framework];
+
+    versions[framework] = packages
+      .map((packageName) => {
+        const version =
+          packageLock.packages?.[getPackageLockPath(framework, packageName)]
+            ?.version ??
+          packageLock.packages?.[`node_modules/${packageName}`]?.version;
+        return version ? `${packageName}@${version}` : packageName;
+      })
+      .join(", ");
+  }
+
+  return versions;
 }
 
 async function waitForPaint(page) {
@@ -268,9 +305,9 @@ function escapeCsv(value) {
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-function createCsv(allResults) {
+function createCsv(allResults, frameworkVersions) {
   const actionLabels = BENCHMARK_ACTION_SEQUENCE.map(({ label }) => label);
-  const rows = [["Framework", ...actionLabels, "Total Average"]];
+  const rows = [["Framework", "Version", ...actionLabels, "Total Average"]];
 
   for (const [framework, results] of Object.entries(allResults)) {
     const durationsByAction = new Map(
@@ -283,13 +320,19 @@ function createCsv(allResults) {
       .reduce((sum, duration) => sum + (parseFloat(duration) || 0), 0)
       .toFixed(2);
 
-    rows.push([framework, ...durations, total]);
+    rows.push([
+      framework,
+      frameworkVersions[framework] ?? "",
+      ...durations,
+      total,
+    ]);
   }
 
   return `${rows.map((row) => row.map(escapeCsv).join(",")).join("\n")}\n`;
 }
 
 async function main() {
+  const frameworkVersions = await getFrameworkVersions();
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   const allResults = {};
 
@@ -304,6 +347,14 @@ async function main() {
   markdown += `**Configuration:** Mode: \`${MODE}\`, Runs per framework: \`${RUNS}\`, Rows: \`${ROWS}\`\n\n`;
   markdown += `**Frameworks:** \`${frameworks.join("`, `")}\`\n\n`;
   markdown += `**Timing method:** Playwright triggers each action, waits for the expected DOM state, waits two \`requestAnimationFrame\` ticks so paint can complete, then records elapsed runner-observed time with high-resolution \`performance.now()\`.\n\n`;
+  markdown += `## Versions\n\n`;
+  markdown += `| Framework | Version |\n| :--- | :--- |\n`;
+
+  for (const framework of frameworks) {
+    markdown += `| ${framework} | ${frameworkVersions[framework]} |\n`;
+  }
+
+  markdown += `\n`;
 
   for (const [fw, results] of Object.entries(allResults)) {
     markdown += `## ${fw.charAt(0).toUpperCase() + fw.slice(1)}\n\n`;
@@ -317,7 +368,10 @@ async function main() {
   }
 
   await fs.writeFile("benchmark-results.md", markdown);
-  await fs.writeFile("benchmark-results.csv", createCsv(allResults));
+  await fs.writeFile(
+    "benchmark-results.csv",
+    createCsv(allResults, frameworkVersions),
+  );
   console.log(
     "\nAll benchmarks complete. Results saved to benchmark-results.md and benchmark-results.csv",
   );
