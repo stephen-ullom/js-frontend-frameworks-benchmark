@@ -1,14 +1,15 @@
 import { component$, useSignal } from "@builder.io/qwik";
 import {
+  BENCHMARK_ACTIONS,
+  BENCHMARK_STATES,
   clearData,
   CONFIG,
   createData,
   swapData,
   updateData,
+  type BenchmarkState,
   type DataRecord,
 } from "@shared/config";
-
-type BenchmarkState = "empty" | "created" | "updated" | "swapped" | "cleared";
 
 const renderCell = (row: DataRecord, header: keyof DataRecord) => {
   const value = row[header];
@@ -17,7 +18,7 @@ const renderCell = (row: DataRecord, header: keyof DataRecord) => {
 
 export default component$(() => {
   const data = useSignal<DataRecord[]>([]);
-  const benchmarkState = useSignal<BenchmarkState>("empty");
+  const benchmarkState = useSignal<BenchmarkState>(BENCHMARK_STATES.EMPTY);
 
   return (
     <div data-benchmark-state={benchmarkState.value}>
@@ -25,41 +26,41 @@ export default component$(() => {
 
       <div data-benchmark-controls>
         <button
-          data-benchmark-action="create"
+          data-benchmark-action={BENCHMARK_ACTIONS.CREATE}
           type="button"
           onClick$={() => {
             data.value = createData();
-            benchmarkState.value = "created";
+            benchmarkState.value = BENCHMARK_STATES.CREATED;
           }}
         >
           {CONFIG.BUTTON_LABELS.CREATE}
         </button>
         <button
-          data-benchmark-action="update"
+          data-benchmark-action={BENCHMARK_ACTIONS.UPDATE}
           type="button"
           onClick$={() => {
             data.value = updateData(data.value);
-            benchmarkState.value = "updated";
+            benchmarkState.value = BENCHMARK_STATES.UPDATED;
           }}
         >
           {CONFIG.BUTTON_LABELS.UPDATE}
         </button>
         <button
-          data-benchmark-action="swap"
+          data-benchmark-action={BENCHMARK_ACTIONS.SWAP}
           type="button"
           onClick$={() => {
             data.value = swapData(data.value);
-            benchmarkState.value = "swapped";
+            benchmarkState.value = BENCHMARK_STATES.SWAPPED;
           }}
         >
           {CONFIG.BUTTON_LABELS.SWAP}
         </button>
         <button
-          data-benchmark-action="clear"
+          data-benchmark-action={BENCHMARK_ACTIONS.CLEAR}
           type="button"
           onClick$={() => {
             data.value = clearData();
-            benchmarkState.value = "cleared";
+            benchmarkState.value = BENCHMARK_STATES.CLEARED;
           }}
         >
           {CONFIG.BUTTON_LABELS.CLEAR}

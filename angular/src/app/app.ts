@@ -1,14 +1,15 @@
 import { Component, computed, signal } from '@angular/core';
 import {
+  BENCHMARK_ACTIONS,
+  BENCHMARK_STATES,
   clearData,
   CONFIG,
   createData,
   swapData,
   updateData,
+  type BenchmarkState,
   type DataRecord,
 } from '@shared/config';
-
-type BenchmarkState = 'empty' | 'created' | 'updated' | 'swapped' | 'cleared';
 
 @Component({
   selector: 'app-root',
@@ -22,29 +23,30 @@ type BenchmarkState = 'empty' | 'created' | 'updated' | 'swapped' | 'cleared';
   ],
 })
 export class App {
+  BENCHMARK_ACTIONS = BENCHMARK_ACTIONS;
   CONFIG = CONFIG;
   data = signal<DataRecord[]>([]);
-  benchmarkState = signal<BenchmarkState>('empty');
+  benchmarkState = signal<BenchmarkState>(BENCHMARK_STATES.EMPTY);
   isEmpty = computed(() => this.data().length === 0);
 
   createRows(): void {
     this.data.set(createData());
-    this.benchmarkState.set('created');
+    this.benchmarkState.set(BENCHMARK_STATES.CREATED);
   }
 
   updateRows(): void {
     this.data.update((data) => updateData(data));
-    this.benchmarkState.set('updated');
+    this.benchmarkState.set(BENCHMARK_STATES.UPDATED);
   }
 
   swapRows(): void {
     this.data.update((data) => swapData(data));
-    this.benchmarkState.set('swapped');
+    this.benchmarkState.set(BENCHMARK_STATES.SWAPPED);
   }
 
   clearRows(): void {
     this.data.set(clearData());
-    this.benchmarkState.set('cleared');
+    this.benchmarkState.set(BENCHMARK_STATES.CLEARED);
   }
 
   renderCell(row: DataRecord, header: keyof DataRecord): string {

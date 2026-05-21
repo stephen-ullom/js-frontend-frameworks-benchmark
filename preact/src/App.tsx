@@ -1,19 +1,20 @@
 import {
+  BENCHMARK_ACTIONS,
+  BENCHMARK_STATES,
   clearData,
   CONFIG,
   createData,
   swapData,
   updateData,
+  type BenchmarkState,
   type DataRecord,
 } from "@shared/config";
 import { useState } from "preact/hooks";
 
-type BenchmarkState = "empty" | "created" | "updated" | "swapped" | "cleared";
-
 function App() {
   const [data, setData] = useState<DataRecord[]>([]);
   const [benchmarkState, setBenchmarkState] =
-    useState<BenchmarkState>("empty");
+    useState<BenchmarkState>(BENCHMARK_STATES.EMPTY);
 
   const renderCell = (row: DataRecord, header: keyof DataRecord) => {
     const value = row[header];
@@ -26,41 +27,41 @@ function App() {
 
       <div data-benchmark-controls>
         <button
-          data-benchmark-action="create"
+          data-benchmark-action={BENCHMARK_ACTIONS.CREATE}
           type="button"
           onClick={() => {
             setData(createData());
-            setBenchmarkState("created");
+            setBenchmarkState(BENCHMARK_STATES.CREATED);
           }}
         >
           {CONFIG.BUTTON_LABELS.CREATE}
         </button>
         <button
-          data-benchmark-action="update"
+          data-benchmark-action={BENCHMARK_ACTIONS.UPDATE}
           type="button"
           onClick={() => {
             setData((prev) => updateData(prev));
-            setBenchmarkState("updated");
+            setBenchmarkState(BENCHMARK_STATES.UPDATED);
           }}
         >
           {CONFIG.BUTTON_LABELS.UPDATE}
         </button>
         <button
-          data-benchmark-action="swap"
+          data-benchmark-action={BENCHMARK_ACTIONS.SWAP}
           type="button"
           onClick={() => {
             setData((prev) => swapData(prev));
-            setBenchmarkState("swapped");
+            setBenchmarkState(BENCHMARK_STATES.SWAPPED);
           }}
         >
           {CONFIG.BUTTON_LABELS.SWAP}
         </button>
         <button
-          data-benchmark-action="clear"
+          data-benchmark-action={BENCHMARK_ACTIONS.CLEAR}
           type="button"
           onClick={() => {
             setData(clearData());
-            setBenchmarkState("cleared");
+            setBenchmarkState(BENCHMARK_STATES.CLEARED);
           }}
         >
           {CONFIG.BUTTON_LABELS.CLEAR}

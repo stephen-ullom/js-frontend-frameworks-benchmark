@@ -1,6 +1,12 @@
 import { spawn } from "node:child_process";
+import { performance } from "node:perf_hooks";
 import { chromium } from "playwright";
 import fs from "node:fs/promises";
+import {
+  BENCHMARK_ACTIONS,
+  BENCHMARK_ACTION_SEQUENCE,
+  BENCHMARK_STATES,
+} from "./shared-config/index.ts";
 
 const frameworks = [
   "react",
@@ -12,16 +18,13 @@ const frameworks = [
   "qwik",
 ];
 
-const actions = [
-  { label: "Create Rows" },
-  { label: "Update Every 10th Row" },
-  { label: "Swap Rows" },
-  { label: "Clear Rows" },
-];
-
 let RUNS = 1;
 let MODE = "build"; // 'build' or 'dev'
 let ROWS = 50;
+
+const actionLabels = Object.fromEntries(
+  BENCHMARK_ACTION_SEQUENCE.map(({ action, label }) => [action, label]),
+);
 
 process.argv.slice(2).forEach((arg) => {
   if (arg.startsWith("--runs=")) RUNS = parseInt(arg.split("=")[1], 10);
@@ -36,7 +39,9 @@ if (ROWS < 10) {
 }
 
 console.log(
-  `\nConfiguration: Mode=${MODE}, Runs=${RUNS}, Rows=${ROWS}, Timing=browser-observed after paint\n`,
+  `\nConfiguration: Mode=${MODE}, Runs=${RUNS}, Rows=${ROWS}, Frameworks=${frameworks.join(
+    ", ",
+  )}, Timing=runner-observed after paint\n`,
 );
 
 function waitForUrl(childProcess) {
@@ -62,43 +67,32 @@ async function waitForPaint(page) {
   );
 }
 
-async function dispatchAction(page, action) {
-  return page.evaluate((actionName) => {
-    const button = document.querySelector(
-      `[data-benchmark-action="${actionName}"]`,
-    );
-    if (!(button instanceof HTMLButtonElement)) {
-      throw new Error(`Missing benchmark action button: ${actionName}`);
-    }
-
-    const start = performance.now();
-    button.click();
-    return start;
-  }, action);
-}
-
 async function getRowCount(page) {
   return page.locator("[data-benchmark-row]").count();
 }
 
 async function getCellText(page, rowIndex, column) {
   return page
-    .locator(`[data-row-index="${rowIndex}"] [data-column="${column}"]`)
+    .locator("[data-benchmark-row]")
+    .nth(rowIndex)
+    .locator(`[data-column="${column}"]`)
     .innerText();
 }
 
 async function getRowId(page, rowIndex) {
   return page
-    .locator(`[data-row-index="${rowIndex}"]`)
+    .locator("[data-benchmark-row]")
+    .nth(rowIndex)
     .getAttribute("data-row-id");
 }
 
 async function measureAction(page, action, waitForExpectedState) {
   await waitForPaint(page);
-  const start = await dispatchAction(page, action);
+  const start = performance.now();
+  await page.locator(`[data-benchmark-action="${action}"]`).click();
   await waitForExpectedState();
-  const end = await waitForPaint(page);
-  return end - start;
+  await waitForPaint(page);
+  return performance.now() - start;
 }
 
 async function runBenchmarkIteration(url, browser) {
@@ -111,63 +105,94 @@ async function runBenchmarkIteration(url, browser) {
 
   const results = [];
 
-  const createDuration = await measureAction(page, "create", async () => {
-    await page.waitForFunction(
-      (rows) =>
-        document.querySelector("[data-benchmark-state='created']") &&
-        document.querySelectorAll("[data-benchmark-row]").length === rows,
-      ROWS,
-    );
+  const createDuration = await measureAction(
+    page,
+    BENCHMARK_ACTIONS.CREATE,
+    async () => {
+      await page.waitForFunction(
+        ({ rows, state }) =>
+          document.querySelector(`[data-benchmark-state='${state}']`) &&
+          document.querySelectorAll("[data-benchmark-row]").length === rows,
+        { rows: ROWS, state: BENCHMARK_STATES.CREATED },
+      );
+    },
+  );
+  results.push({
+    action: actionLabels[BENCHMARK_ACTIONS.CREATE],
+    duration: createDuration,
   });
-  results.push({ action: "Create Rows", duration: createDuration });
 
   const firstSalary = parseFloat(await getCellText(page, 0, "salary"));
-  const updateDuration = await measureAction(page, "update", async () => {
-    await page.waitForFunction((expectedSalary) => {
-      const salary = document.querySelector(
-        `[data-row-index="0"] [data-column="salary"]`,
+  const updateDuration = await measureAction(
+    page,
+    BENCHMARK_ACTIONS.UPDATE,
+    async () => {
+      await page.waitForFunction(
+        ({ expectedSalary, state }) => {
+          const firstRow = document.querySelectorAll("[data-benchmark-row]")[0];
+          const salary = firstRow?.querySelector(`[data-column="salary"]`);
+          return (
+            document.querySelector(`[data-benchmark-state='${state}']`) &&
+            salary?.textContent?.trim() === String(expectedSalary)
+          );
+        },
+        { expectedSalary: firstSalary + 50, state: BENCHMARK_STATES.UPDATED },
       );
-      return (
-        document.querySelector("[data-benchmark-state='updated']") &&
-        salary?.textContent?.trim() === String(expectedSalary)
-      );
-    }, firstSalary + 50);
+    },
+  );
+  results.push({
+    action: actionLabels[BENCHMARK_ACTIONS.UPDATE],
+    duration: updateDuration,
   });
-  results.push({ action: "Update Every 10th Row", duration: updateDuration });
 
   const secondRowId = await getRowId(page, 1);
   const swapTargetIndex = ROWS - 9;
   const swapTargetRowId = await getRowId(page, swapTargetIndex);
-  const swapDuration = await measureAction(page, "swap", async () => {
-    await page.waitForFunction(
-      ({ secondId, targetIndex, targetId }) => {
-        const secondRow = document.querySelector(`[data-row-index="1"]`);
-        const targetRow = document.querySelector(
-          `[data-row-index="${targetIndex}"]`,
-        );
-        return (
-          document.querySelector("[data-benchmark-state='swapped']") &&
-          secondRow?.getAttribute("data-row-id") === targetId &&
-          targetRow?.getAttribute("data-row-id") === secondId
-        );
-      },
-      {
-        secondId: secondRowId,
-        targetIndex: swapTargetIndex,
-        targetId: swapTargetRowId,
-      },
-    );
+  const swapDuration = await measureAction(
+    page,
+    BENCHMARK_ACTIONS.SWAP,
+    async () => {
+      await page.waitForFunction(
+        ({ secondId, state, targetIndex, targetId }) => {
+          const rows = document.querySelectorAll("[data-benchmark-row]");
+          const secondRow = rows[1];
+          const targetRow = rows[targetIndex];
+          return (
+            document.querySelector(`[data-benchmark-state='${state}']`) &&
+            secondRow?.getAttribute("data-row-id") === targetId &&
+            targetRow?.getAttribute("data-row-id") === secondId
+          );
+        },
+        {
+          secondId: secondRowId,
+          state: BENCHMARK_STATES.SWAPPED,
+          targetIndex: swapTargetIndex,
+          targetId: swapTargetRowId,
+        },
+      );
+    },
+  );
+  results.push({
+    action: actionLabels[BENCHMARK_ACTIONS.SWAP],
+    duration: swapDuration,
   });
-  results.push({ action: "Swap Rows", duration: swapDuration });
 
-  const clearDuration = await measureAction(page, "clear", async () => {
-    await page.waitForFunction(
-      () =>
-        document.querySelector("[data-benchmark-state='cleared']") &&
-        document.querySelectorAll("[data-benchmark-row]").length === 0,
-    );
+  const clearDuration = await measureAction(
+    page,
+    BENCHMARK_ACTIONS.CLEAR,
+    async () => {
+      await page.waitForFunction(
+        (state) =>
+          document.querySelector(`[data-benchmark-state='${state}']`) &&
+          document.querySelectorAll("[data-benchmark-row]").length === 0,
+        BENCHMARK_STATES.CLEARED,
+      );
+    },
+  );
+  results.push({
+    action: actionLabels[BENCHMARK_ACTIONS.CLEAR],
+    duration: clearDuration,
   });
-  results.push({ action: "Clear Rows", duration: clearDuration });
 
   const finalRowCount = await getRowCount(page);
   if (finalRowCount !== 0) {
@@ -222,7 +247,7 @@ async function processFramework(framework, browser) {
 }
 
 function calculateAverages(allRunsData) {
-  return actions.map(({ label }) => {
+  return BENCHMARK_ACTION_SEQUENCE.map(({ label }) => {
     const durations = allRunsData
       .flat()
       .filter((item) => item.action === label)
@@ -244,15 +269,21 @@ function escapeCsv(value) {
 }
 
 function createCsv(allResults) {
-  const rows = [["framework", "action", "avg_browser_observed_duration_ms"]];
+  const actionLabels = BENCHMARK_ACTION_SEQUENCE.map(({ label }) => label);
+  const rows = [["Framework", ...actionLabels, "Total Average"]];
 
   for (const [framework, results] of Object.entries(allResults)) {
-    let total = 0;
-    results.forEach((result) => {
-      total += parseFloat(result.duration);
-      rows.push([framework, result.action, result.duration]);
-    });
-    rows.push([framework, "Total Average", total.toFixed(2)]);
+    const durationsByAction = new Map(
+      results.map((result) => [result.action, result.duration]),
+    );
+    const durations = actionLabels.map(
+      (label) => durationsByAction.get(label) ?? "",
+    );
+    const total = durations
+      .reduce((sum, duration) => sum + (parseFloat(duration) || 0), 0)
+      .toFixed(2);
+
+    rows.push([framework, ...durations, total]);
   }
 
   return `${rows.map((row) => row.map(escapeCsv).join(",")).join("\n")}\n`;
@@ -271,11 +302,12 @@ async function main() {
 
   let markdown = `# Framework Benchmark Results\n\n`;
   markdown += `**Configuration:** Mode: \`${MODE}\`, Runs per framework: \`${RUNS}\`, Rows: \`${ROWS}\`\n\n`;
-  markdown += `**Timing method:** Playwright triggers each action in the browser, waits for the expected DOM state, waits two \`requestAnimationFrame\` ticks so paint can complete, then records elapsed browser time with \`performance.now()\`.\n\n`;
+  markdown += `**Frameworks:** \`${frameworks.join("`, `")}\`\n\n`;
+  markdown += `**Timing method:** Playwright triggers each action, waits for the expected DOM state, waits two \`requestAnimationFrame\` ticks so paint can complete, then records elapsed runner-observed time with high-resolution \`performance.now()\`.\n\n`;
 
   for (const [fw, results] of Object.entries(allResults)) {
     markdown += `## ${fw.charAt(0).toUpperCase() + fw.slice(1)}\n\n`;
-    markdown += `| Action | Avg Browser-Observed Duration (ms) |\n| :--- | ---: |\n`;
+    markdown += `| Action | Avg Runner-Observed Duration (ms) |\n| :--- | ---: |\n`;
     let total = 0;
     results.forEach((res) => {
       markdown += `| ${res.action} | ${res.duration} |\n`;

@@ -1,22 +1,18 @@
 <script lang="ts">
   import {
+    BENCHMARK_ACTIONS,
+    BENCHMARK_STATES,
     clearData,
     CONFIG,
     createData,
     swapData,
     updateData,
+    type BenchmarkState,
     type DataRecord,
   } from "@shared/config";
 
-  type BenchmarkState =
-    | "empty"
-    | "created"
-    | "updated"
-    | "swapped"
-    | "cleared";
-
   let data: DataRecord[] = $state.raw([]);
-  let benchmarkState: BenchmarkState = $state("empty");
+  let benchmarkState: BenchmarkState = $state(BENCHMARK_STATES.EMPTY);
 
   function renderCell(row: DataRecord, header: keyof DataRecord) {
     const value = row[header];
@@ -25,22 +21,22 @@
 
   function createRows() {
     data = createData();
-    benchmarkState = "created";
+    benchmarkState = BENCHMARK_STATES.CREATED;
   }
 
   function updateRows() {
     data = updateData(data);
-    benchmarkState = "updated";
+    benchmarkState = BENCHMARK_STATES.UPDATED;
   }
 
   function swapRows() {
     data = swapData(data);
-    benchmarkState = "swapped";
+    benchmarkState = BENCHMARK_STATES.SWAPPED;
   }
 
   function clearRows() {
     data = clearData();
-    benchmarkState = "cleared";
+    benchmarkState = BENCHMARK_STATES.CLEARED;
   }
 </script>
 
@@ -48,16 +44,32 @@
   <h1>{CONFIG.UI_TEXT.TITLE} - External Benchmark</h1>
 
   <div data-benchmark-controls>
-    <button data-benchmark-action="create" type="button" onclick={createRows}>
+    <button
+      data-benchmark-action={BENCHMARK_ACTIONS.CREATE}
+      type="button"
+      onclick={createRows}
+    >
       {CONFIG.BUTTON_LABELS.CREATE}
     </button>
-    <button data-benchmark-action="update" type="button" onclick={updateRows}>
+    <button
+      data-benchmark-action={BENCHMARK_ACTIONS.UPDATE}
+      type="button"
+      onclick={updateRows}
+    >
       {CONFIG.BUTTON_LABELS.UPDATE}
     </button>
-    <button data-benchmark-action="swap" type="button" onclick={swapRows}>
+    <button
+      data-benchmark-action={BENCHMARK_ACTIONS.SWAP}
+      type="button"
+      onclick={swapRows}
+    >
       {CONFIG.BUTTON_LABELS.SWAP}
     </button>
-    <button data-benchmark-action="clear" type="button" onclick={clearRows}>
+    <button
+      data-benchmark-action={BENCHMARK_ACTIONS.CLEAR}
+      type="button"
+      onclick={clearRows}
+    >
       {CONFIG.BUTTON_LABELS.CLEAR}
     </button>
   </div>

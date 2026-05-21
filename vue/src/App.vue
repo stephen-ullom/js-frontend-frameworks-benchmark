@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import {
+  BENCHMARK_ACTIONS,
+  BENCHMARK_STATES,
   clearData,
   CONFIG,
   createData,
   swapData,
   updateData,
+  type BenchmarkState,
   type DataRecord,
 } from "@shared/config";
 
-type BenchmarkState = "empty" | "created" | "updated" | "swapped" | "cleared";
-
 const data = ref<DataRecord[]>([]);
-const benchmarkState = ref<BenchmarkState>("empty");
+const benchmarkState = ref<BenchmarkState>(BENCHMARK_STATES.EMPTY);
 
 const renderCell = (row: DataRecord, header: keyof DataRecord): string => {
   const value = row[header];
@@ -21,22 +22,22 @@ const renderCell = (row: DataRecord, header: keyof DataRecord): string => {
 
 const createRows = () => {
   data.value = createData();
-  benchmarkState.value = "created";
+  benchmarkState.value = BENCHMARK_STATES.CREATED;
 };
 
 const updateRows = () => {
   data.value = updateData(data.value);
-  benchmarkState.value = "updated";
+  benchmarkState.value = BENCHMARK_STATES.UPDATED;
 };
 
 const swapRows = () => {
   data.value = swapData(data.value);
-  benchmarkState.value = "swapped";
+  benchmarkState.value = BENCHMARK_STATES.SWAPPED;
 };
 
 const clearRows = () => {
   data.value = clearData();
-  benchmarkState.value = "cleared";
+  benchmarkState.value = BENCHMARK_STATES.CLEARED;
 };
 </script>
 
@@ -45,16 +46,32 @@ const clearRows = () => {
     <h1>{{ CONFIG.UI_TEXT.TITLE }} - External Benchmark</h1>
 
     <div data-benchmark-controls>
-      <button data-benchmark-action="create" type="button" @click="createRows">
+      <button
+        :data-benchmark-action="BENCHMARK_ACTIONS.CREATE"
+        type="button"
+        @click="createRows"
+      >
         {{ CONFIG.BUTTON_LABELS.CREATE }}
       </button>
-      <button data-benchmark-action="update" type="button" @click="updateRows">
+      <button
+        :data-benchmark-action="BENCHMARK_ACTIONS.UPDATE"
+        type="button"
+        @click="updateRows"
+      >
         {{ CONFIG.BUTTON_LABELS.UPDATE }}
       </button>
-      <button data-benchmark-action="swap" type="button" @click="swapRows">
+      <button
+        :data-benchmark-action="BENCHMARK_ACTIONS.SWAP"
+        type="button"
+        @click="swapRows"
+      >
         {{ CONFIG.BUTTON_LABELS.SWAP }}
       </button>
-      <button data-benchmark-action="clear" type="button" @click="clearRows">
+      <button
+        :data-benchmark-action="BENCHMARK_ACTIONS.CLEAR"
+        type="button"
+        @click="clearRows"
+      >
         {{ CONFIG.BUTTON_LABELS.CLEAR }}
       </button>
     </div>
