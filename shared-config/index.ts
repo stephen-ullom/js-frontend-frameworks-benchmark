@@ -17,6 +17,34 @@ export type DataRecord = {
   tags: string[];
 };
 
+export const BENCHMARK_STATES = {
+  EMPTY: "empty",
+  CREATED: "created",
+  UPDATED: "updated",
+  SWAPPED: "swapped",
+  CLEARED: "cleared",
+} as const;
+
+export type BenchmarkState =
+  (typeof BENCHMARK_STATES)[keyof typeof BENCHMARK_STATES];
+
+export const BENCHMARK_ACTIONS = {
+  CREATE: "create",
+  UPDATE: "update",
+  SWAP: "swap",
+  CLEAR: "clear",
+} as const;
+
+export type BenchmarkAction =
+  (typeof BENCHMARK_ACTIONS)[keyof typeof BENCHMARK_ACTIONS];
+
+export const BENCHMARK_ACTION_SEQUENCE = [
+  { action: BENCHMARK_ACTIONS.CREATE, label: "Create Rows" },
+  { action: BENCHMARK_ACTIONS.UPDATE, label: "Update Every 10th Row" },
+  { action: BENCHMARK_ACTIONS.SWAP, label: "Swap Rows" },
+  { action: BENCHMARK_ACTIONS.CLEAR, label: "Clear Rows" },
+] as const;
+
 const getRowCount = () => {
   if (typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search);
@@ -65,7 +93,7 @@ export const CONFIG = {
     PERF_DEFAULT: "Last Action: N/A | Duration: <strong>0.00ms</strong>",
     getPerfResult: (name: string, duration: number) =>
       `Last Action: ${name} | Duration: <strong>${duration.toFixed(
-        2
+        2,
       )}ms</strong>`,
   },
 };
@@ -229,7 +257,7 @@ export function buildData(rowCount: number): DataRecord[] {
       hireDate: new Date(
         2010 + Math.floor(random() * 14),
         Math.floor(random() * 12),
-        Math.floor(random() * 28) + 1
+        Math.floor(random() * 28) + 1,
       )
         .toISOString()
         .split("T")[0],
@@ -252,7 +280,7 @@ export const createData = (): DataRecord[] => {
 
 export const updateData = (data: DataRecord[]): DataRecord[] => {
   return data.map((row, i) =>
-    i % 10 === 0 ? { ...row, salary: row.salary + 50 } : row
+    i % 10 === 0 ? { ...row, salary: row.salary + 50 } : row,
   );
 };
 

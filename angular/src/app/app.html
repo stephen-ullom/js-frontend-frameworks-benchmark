@@ -1,48 +1,26 @@
-<!-- benchmark.component.html -->
-<div>
-  <h1>{{ CONFIG.UI_TEXT.TITLE }} - Automated Benchmark</h1>
+<div [attr.data-benchmark-state]="benchmarkState()">
+  <h1>{{ CONFIG.UI_TEXT.TITLE }} - External Benchmark</h1>
 
-  @if (isRunning()) {
-    <h3 style="color: blue">Running Benchmark... (Step {{ step() }} of 4)</h3>
-  }
+  <div data-benchmark-controls>
+    <button [attr.data-benchmark-action]="BENCHMARK_ACTIONS.CREATE" type="button" (click)="createRows()">
+      {{ CONFIG.BUTTON_LABELS.CREATE }}
+    </button>
+    <button [attr.data-benchmark-action]="BENCHMARK_ACTIONS.UPDATE" type="button" (click)="updateRows()">
+      {{ CONFIG.BUTTON_LABELS.UPDATE }}
+    </button>
+    <button [attr.data-benchmark-action]="BENCHMARK_ACTIONS.SWAP" type="button" (click)="swapRows()">
+      {{ CONFIG.BUTTON_LABELS.SWAP }}
+    </button>
+    <button [attr.data-benchmark-action]="BENCHMARK_ACTIONS.CLEAR" type="button" (click)="clearRows()">
+      {{ CONFIG.BUTTON_LABELS.CLEAR }}
+    </button>
+  </div>
 
-  <!-- Results table (only when benchmark is done) -->
-  @if (step() === 5 && results().length > 0) {
-    <div class="results-container">
-      <h2>Benchmark Results</h2>
-      <table border="1" style="width: 100%; background-color: white">
-        <thead>
-          <tr>
-            <th>Action</th>
-            <th>Duration (ms)</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (res of results(); track $index) {
-            <tr>
-              <td>{{ res.action }}</td>
-              <td>
-                <strong>{{ res.duration.toFixed(2) }}</strong>
-              </td>
-            </tr>
-          }
-          <tr>
-            <td><strong>Total Time</strong></td>
-            <td>
-              <strong>{{ totalTime().toFixed(2) }}</strong>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  }
-
-  <!-- Data table -->
   <div style="overflow: auto; max-height: 40vh; margin-top: 1rem">
-    @if (data().length === 0) {
+    @if (isEmpty()) {
       <p>{{ CONFIG.UI_TEXT.EMPTY_TABLE }}</p>
     } @else {
-      <table border="1">
+      <table border="1" data-benchmark-table>
         <thead>
           <tr>
             @for (header of CONFIG.TABLE_HEADERS; track header) {
@@ -51,10 +29,14 @@
           </tr>
         </thead>
         <tbody>
-          @for (row of data(); track row.uuid) {
-            <tr>
+          @for (row of data(); track row.uuid; let rowIndex = $index) {
+            <tr
+              data-benchmark-row
+              [attr.data-row-index]="rowIndex"
+              [attr.data-row-id]="row.uuid"
+            >
               @for (header of CONFIG.TABLE_HEADERS; track header) {
-                <td>
+                <td [attr.data-column]="header">
                   {{ renderCell(row, header) }}
                 </td>
               }

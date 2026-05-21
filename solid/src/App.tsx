@@ -1,143 +1,72 @@
 import {
+  BENCHMARK_ACTIONS,
+  BENCHMARK_STATES,
   clearData,
   CONFIG,
   createData,
-  monitor,
   swapData,
   updateData,
+  type BenchmarkState,
   type DataRecord,
 } from "@shared/config";
-import {
-  createSignal,
-  createEffect,
-  onMount,
-  onCleanup,
-  For,
-  Show,
-} from "solid-js";
-
-type BenchmarkResult = { action: string; duration: number };
+import { createSignal, For, Show } from "solid-js";
 
 function App() {
   const [data, setData] = createSignal<DataRecord[]>([]);
-  const [results, setResults] = createSignal<BenchmarkResult[]>([]);
-  const [step, setStep] = createSignal(1);
-
-  const resultsArr: BenchmarkResult[] = [];
-
-  onMount(() => {
-    const timer = setTimeout(() => {
-      monitor.start(CONFIG.ACTION_TEXTS.CREATE);
-      setData(createData());
-      setStep(2);
-    }, 500);
-    onCleanup(() => clearTimeout(timer));
-  });
-
-  createEffect(() => {
-    const currentStep = step();
-
-    const result = monitor.stop();
-
-    if (result) {
-      resultsArr.push({
-        action: result.name,
-        duration: result.duration,
-      });
-    }
-
-    if (currentStep > 1 && currentStep < 5 && result) {
-      const timer = setTimeout(() => {
-        if (currentStep === 2) {
-          monitor.start(CONFIG.ACTION_TEXTS.UPDATE);
-          setData((prev) => updateData(prev));
-          setStep(3);
-        } else if (currentStep === 3) {
-          monitor.start(CONFIG.ACTION_TEXTS.SWAP);
-          setData((prev) => swapData(prev));
-          setStep(4);
-        } else if (currentStep === 4) {
-          monitor.start(CONFIG.ACTION_TEXTS.CLEAR);
-          setData(clearData());
-          setStep(5);
-        }
-      }, 500);
-      onCleanup(() => clearTimeout(timer));
-    }
-
-    if (currentStep === 5) {
-      setResults([...resultsArr]);
-    }
-  });
+  const [benchmarkState, setBenchmarkState] =
+    createSignal<BenchmarkState>(BENCHMARK_STATES.EMPTY);
 
   const renderCell = (row: DataRecord, header: keyof DataRecord) => {
     const value = row[header];
     return Array.isArray(value) ? value.join(", ") : String(value);
   };
 
-  const isRunning = () => step() > 0 && step() <= 4;
-
   return (
-    <div>
-      <h1>{CONFIG.UI_TEXT.TITLE} - Automated Benchmark</h1>
+    <div data-benchmark-state={benchmarkState()}>
+      <h1>{CONFIG.UI_TEXT.TITLE} - External Benchmark</h1>
 
-      <Show when={isRunning()}>
-        <h3 style={{ color: "blue" }}>
-          Running Benchmark... (Step {step()} of 4)
-        </h3>
-      </Show>
-
-      <Show when={step() === 5}>
-        <div
-          style={{
-            "margin-bottom": "2rem",
-            padding: "1rem",
-            "background-color": "#f0f0f0",
+      <div data-benchmark-controls>
+        <button
+          data-benchmark-action={BENCHMARK_ACTIONS.CREATE}
+          type="button"
+          onClick={() => {
+            setData(createData());
+            setBenchmarkState(BENCHMARK_STATES.CREATED);
           }}
         >
-          <h2>Benchmark Results</h2>
-          <table
-            // @ts-ignore
-            border={1}
-            style={{
-              "border-collapse": "collapse",
-              width: "100%",
-              "background-color": "white",
-            }}
-          >
-            <thead>
-              <tr>
-                <th style={{ padding: "8px" }}>Action</th>
-                <th style={{ padding: "8px" }}>Duration (ms)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={results()}>
-                {(res) => (
-                  <tr>
-                    <td style={{ padding: "8px" }}>{res.action}</td>
-                    <td style={{ padding: "8px" }}>
-                      <strong>{res.duration.toFixed(2)}</strong>
-                    </td>
-                  </tr>
-                )}
-              </For>
-              <tr>
-                <td style={{ padding: "8px" }}>
-                  <strong>Total Time</strong>
-                </td>
-                <td style={{ padding: "8px" }}>
-                  <strong>
-                    {results()
-                      .reduce((acc, curr) => acc + curr.duration, 0)
-                      .toFixed(2)}
-                  </strong>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </Show>
+          {CONFIG.BUTTON_LABELS.CREATE}
+        </button>
+        <button
+          data-benchmark-action={BENCHMARK_ACTIONS.UPDATE}
+          type="button"
+          onClick={() => {
+            setData((prev) => updateData(prev));
+            setBenchmarkState(BENCHMARK_STATES.UPDATED);
+          }}
+        >
+          {CONFIG.BUTTON_LABELS.UPDATE}
+        </button>
+        <button
+          data-benchmark-action={BENCHMARK_ACTIONS.SWAP}
+          type="button"
+          onClick={() => {
+            setData((prev) => swapData(prev));
+            setBenchmarkState(BENCHMARK_STATES.SWAPPED);
+          }}
+        >
+          {CONFIG.BUTTON_LABELS.SWAP}
+        </button>
+        <button
+          data-benchmark-action={BENCHMARK_ACTIONS.CLEAR}
+          type="button"
+          onClick={() => {
+            setData(clearData());
+            setBenchmarkState(BENCHMARK_STATES.CLEARED);
+          }}
+        >
+          {CONFIG.BUTTON_LABELS.CLEAR}
+        </button>
+      </div>
 
       <div
         style={{ overflow: "auto", "max-height": "40vh", "margin-top": "1rem" }}
@@ -147,7 +76,11 @@ function App() {
           fallback={<p>{CONFIG.UI_TEXT.EMPTY_TABLE}</p>}
         >
           {/* @ts-ignore */}
-          <table border={1} style={{ "border-collapse": "collapse" }}>
+          <table
+            border={1}
+            data-benchmark-table
+            style={{ "border-collapse": "collapse" }}
+          >
             <thead>
               <tr>
                 <For each={CONFIG.TABLE_HEADERS}>{(h) => <th>{h}</th>}</For>
@@ -155,11 +88,17 @@ function App() {
             </thead>
             <tbody>
               <For each={data()}>
-                {(row) => (
-                  <tr>
+                {(row, rowIndex) => (
+                  <tr
+                    data-benchmark-row
+                    data-row-index={rowIndex()}
+                    data-row-id={row.uuid}
+                  >
                     <For each={CONFIG.TABLE_HEADERS}>
                       {(header) => (
-                        <td>{renderCell(row, header as keyof DataRecord)}</td>
+                        <td data-column={header}>
+                          {renderCell(row, header as keyof DataRecord)}
+                        </td>
                       )}
                     </For>
                   </tr>

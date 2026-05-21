@@ -1,139 +1,82 @@
 import {
+  BENCHMARK_ACTIONS,
+  BENCHMARK_STATES,
   clearData,
   CONFIG,
   createData,
-  monitor,
   swapData,
   updateData,
+  type BenchmarkState,
   type DataRecord,
 } from "@shared/config";
-import { useLayoutEffect, useState, useEffect, useRef } from "react";
-
-type BenchmarkResult = { action: string; duration: number };
+import { useState } from "react";
 
 function App() {
   const [data, setData] = useState<DataRecord[]>([]);
-  const [results, setResults] = useState<BenchmarkResult[]>([]);
-  const [step, setStep] = useState(1);
-
-  const resultsRef = useRef<BenchmarkResult[]>([]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      monitor.start(CONFIG.ACTION_TEXTS.CREATE);
-      setData(createData());
-      setStep(2);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useLayoutEffect(() => {
-    const result = monitor.stop();
-
-    if (result) {
-      resultsRef.current.push({
-        action: result.name,
-        duration: result.duration,
-      });
-    }
-
-    if (step > 1 && step < 5 && result) {
-      const timer = setTimeout(() => {
-        if (step === 2) {
-          monitor.start(CONFIG.ACTION_TEXTS.UPDATE);
-          setData((prev) => updateData(prev));
-          setStep(3);
-        } else if (step === 3) {
-          monitor.start(CONFIG.ACTION_TEXTS.SWAP);
-          setData((prev) => swapData(prev));
-          setStep(4);
-        } else if (step === 4) {
-          monitor.start(CONFIG.ACTION_TEXTS.CLEAR);
-          setData(clearData());
-          setStep(5);
-        }
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [step]);
-
-  useEffect(() => {
-    if (step === 5) {
-      setResults(resultsRef.current);
-    }
-  }, [step]);
+  const [benchmarkState, setBenchmarkState] =
+    useState<BenchmarkState>(BENCHMARK_STATES.EMPTY);
 
   const renderCell = (row: DataRecord, header: keyof DataRecord) => {
     const value = row[header];
     return Array.isArray(value) ? value.join(", ") : String(value);
   };
 
-  const isRunning = step > 0 && step <= 4;
-
   return (
-    <div>
-      <h1>{CONFIG.UI_TEXT.TITLE} - Automated Benchmark</h1>
+    <div data-benchmark-state={benchmarkState}>
+      <h1>{CONFIG.UI_TEXT.TITLE} - External Benchmark</h1>
 
-      {isRunning && (
-        <h3 style={{ color: "blue" }}>
-          Running Benchmark... (Step {step} of 4)
-        </h3>
-      )}
-
-      {step === 5 && (
-        <div
-          style={{
-            marginBottom: "2rem",
-            padding: "1rem",
-            backgroundColor: "#f0f0f0",
+      <div data-benchmark-controls>
+        <button
+          data-benchmark-action={BENCHMARK_ACTIONS.CREATE}
+          type="button"
+          onClick={() => {
+            setData(createData());
+            setBenchmarkState(BENCHMARK_STATES.CREATED);
           }}
         >
-          <h2>Benchmark Results</h2>
-          <table
-            border={1}
-            style={{
-              borderCollapse: "collapse",
-              width: "100%",
-              backgroundColor: "white",
-            }}
-          >
-            <thead>
-              <tr>
-                <th style={{ padding: "8px" }}>Action</th>
-                <th style={{ padding: "8px" }}>Duration (ms)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((res, idx) => (
-                <tr key={idx}>
-                  <td style={{ padding: "8px" }}>{res.action}</td>
-                  <td style={{ padding: "8px" }}>
-                    <strong>{res.duration.toFixed(2)}</strong>
-                  </td>
-                </tr>
-              ))}
-              <tr>
-                <td style={{ padding: "8px" }}>
-                  <strong>Total Time</strong>
-                </td>
-                <td style={{ padding: "8px" }}>
-                  <strong>
-                    {results
-                      .reduce((acc, curr) => acc + curr.duration, 0)
-                      .toFixed(2)}
-                  </strong>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
+          {CONFIG.BUTTON_LABELS.CREATE}
+        </button>
+        <button
+          data-benchmark-action={BENCHMARK_ACTIONS.UPDATE}
+          type="button"
+          onClick={() => {
+            setData((prev) => updateData(prev));
+            setBenchmarkState(BENCHMARK_STATES.UPDATED);
+          }}
+        >
+          {CONFIG.BUTTON_LABELS.UPDATE}
+        </button>
+        <button
+          data-benchmark-action={BENCHMARK_ACTIONS.SWAP}
+          type="button"
+          onClick={() => {
+            setData((prev) => swapData(prev));
+            setBenchmarkState(BENCHMARK_STATES.SWAPPED);
+          }}
+        >
+          {CONFIG.BUTTON_LABELS.SWAP}
+        </button>
+        <button
+          data-benchmark-action={BENCHMARK_ACTIONS.CLEAR}
+          type="button"
+          onClick={() => {
+            setData(clearData());
+            setBenchmarkState(BENCHMARK_STATES.CLEARED);
+          }}
+        >
+          {CONFIG.BUTTON_LABELS.CLEAR}
+        </button>
+      </div>
 
       <div style={{ overflow: "auto", maxHeight: "40vh", marginTop: "1rem" }}>
         {data.length === 0 ? (
           <p>{CONFIG.UI_TEXT.EMPTY_TABLE}</p>
         ) : (
-          <table border={1} style={{ borderCollapse: "collapse" }}>
+          <table
+            border={1}
+            data-benchmark-table
+            style={{ borderCollapse: "collapse" }}
+          >
             <thead>
               <tr>
                 {CONFIG.TABLE_HEADERS.map((h) => (
@@ -142,10 +85,17 @@ function App() {
               </tr>
             </thead>
             <tbody>
-              {data.map((row) => (
-                <tr key={row.uuid}>
+              {data.map((row, rowIndex) => (
+                <tr
+                  data-benchmark-row
+                  data-row-index={rowIndex}
+                  data-row-id={row.uuid}
+                  key={row.uuid}
+                >
                   {CONFIG.TABLE_HEADERS.map((header) => (
-                    <td key={header}>{renderCell(row, header)}</td>
+                    <td data-column={header} key={header}>
+                      {renderCell(row, header)}
+                    </td>
                   ))}
                 </tr>
               ))}

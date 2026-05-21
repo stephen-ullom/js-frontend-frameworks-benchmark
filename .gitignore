@@ -7,9 +7,10 @@
 angular/.angular/
 svelte/.svelte-kit/
 qwik/tmp/
+qwik/server/
 
 # MacOS
 .DS_Store
 
 # Results
-benchmark-results.md
+benchmark-results.*
