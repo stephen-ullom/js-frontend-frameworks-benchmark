@@ -305,6 +305,10 @@ function escapeCsv(value) {
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function createCsv(allResults, frameworkVersions) {
   const actionLabels = BENCHMARK_ACTION_SEQUENCE.map(({ label }) => label);
   const rows = [["Framework", "Version", ...actionLabels, "Total Average"]];
@@ -321,7 +325,7 @@ function createCsv(allResults, frameworkVersions) {
       .toFixed(2);
 
     rows.push([
-      framework,
+      capitalize(framework),
       frameworkVersions[framework] ?? "",
       ...durations,
       total,
